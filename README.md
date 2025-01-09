@@ -106,6 +106,6 @@ El desarrollo se llevó a cabo utilizando metodologías ágiles basadas en Scrum
 ## Contacto
 
 **Autor:** Iñigo Lens  
-**Email:** inigolensblasco@gmail.ocm
+**Email:** inigolensblasco@gmail.com
 **Universidad:** Universidad de Deusto  
 
