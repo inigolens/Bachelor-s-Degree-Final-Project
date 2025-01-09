@@ -1,0 +1,149 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!244 &-7934260444732415922
+AudioMixerEffectController:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  m_EffectID: 4851978f41a97e94ebd306cdd42e0f22
+  m_EffectName: Attenuation
+  m_MixLevel: 260c6da4d05d21d4aac3bef1a4115af4
+  m_Parameters: []
+  m_SendTarget: {fileID: 0}
+  m_EnableWetMix: 0
+  m_Bypass: 0
+--- !u!241 &24100000
+AudioMixerController:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Sonido
+  m_OutputGroup: {fileID: 0}
+  m_MasterGroup: {fileID: 24300002}
+  m_Snapshots:
+  - {fileID: 24500006}
+  m_StartSnapshot: {fileID: 24500006}
+  m_SuspendThreshold: -80
+  m_EnableSuspend: 1
+  m_UpdateMode: 0
+  m_ExposedParameters:
+  - guid: 4db033280960b7642b47f848fe76bb79
+    name: MyExposedParam
+  - guid: f8048967e778fd14bbc0dc6727e55286
+    name: Musica
+  - guid: 46282acb78bb8dd40af6df7d3d48c16e
+    name: Sonido
+  m_AudioMixerGroupViews:
+  - guids:
+    - b40eba73be230314f8c890fcf889db19
+    - e0c81ed2124590d4cbb119cee3b29891
+    - 8b62a430feff0cf4d803a1941ae8646d
+    name: View
+  m_CurrentViewIndex: 0
+  m_TargetSnapshot: {fileID: 24500006}
+--- !u!243 &24300002
+AudioMixerGroupController:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Master
+  m_AudioMixer: {fileID: 24100000}
+  m_GroupID: b40eba73be230314f8c890fcf889db19
+  m_Children:
+  - {fileID: 4340706355069299745}
+  - {fileID: 6036849853086289042}
+  m_Volume: 4db033280960b7642b47f848fe76bb79
+  m_Pitch: fb44e9134fb8c5149977bf2298b5e5ad
+  m_Send: 00000000000000000000000000000000
+  m_Effects:
+  - {fileID: 24400004}
+  m_UserColorIndex: 0
+  m_Mute: 0
+  m_Solo: 0
+  m_BypassEffects: 0
+--- !u!244 &24400004
+AudioMixerEffectController:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  m_EffectID: 891793d33b2b5664c96bc9501521eb5a
+  m_EffectName: Attenuation
+  m_MixLevel: 152fdb461497bb74e9542f309ef79f1b
+  m_Parameters: []
+  m_SendTarget: {fileID: 0}
+  m_EnableWetMix: 0
+  m_Bypass: 0
+--- !u!245 &24500006
+AudioMixerSnapshotController:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Snapshot
+  m_AudioMixer: {fileID: 24100000}
+  m_SnapshotID: c4f4ae6a20cfafd49b074beeb04097ae
+  m_FloatValues:
+    56758741e2aaf9848bf225df930f7351: -0.1668515
+    38b10d22c02f7a44891d59eef6c34638: -0.39762527
+    f8048967e778fd14bbc0dc6727e55286: -80
+    4db033280960b7642b47f848fe76bb79: 0.3945695
+    46282acb78bb8dd40af6df7d3d48c16e: -80
+  m_TransitionOverrides: {}
+--- !u!243 &4340706355069299745
+AudioMixerGroupController:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Musica
+  m_AudioMixer: {fileID: 24100000}
+  m_GroupID: e0c81ed2124590d4cbb119cee3b29891
+  m_Children: []
+  m_Volume: f8048967e778fd14bbc0dc6727e55286
+  m_Pitch: 286ef94b80f5aa94f97810b8f020404e
+  m_Send: 00000000000000000000000000000000
+  m_Effects:
+  - {fileID: -7934260444732415922}
+  m_UserColorIndex: 0
+  m_Mute: 0
+  m_Solo: 0
+  m_BypassEffects: 0
+--- !u!244 &5221877141426783519
+AudioMixerEffectController:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  m_EffectID: 000a5393ac7bbc84f8c2d726c0fdb3bf
+  m_EffectName: Attenuation
+  m_MixLevel: d45001a037825354d84efe2487d0ac65
+  m_Parameters: []
+  m_SendTarget: {fileID: 0}
+  m_EnableWetMix: 0
+  m_Bypass: 0
+--- !u!243 &6036849853086289042
+AudioMixerGroupController:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Sonido
+  m_AudioMixer: {fileID: 24100000}
+  m_GroupID: 8b62a430feff0cf4d803a1941ae8646d
+  m_Children: []
+  m_Volume: 46282acb78bb8dd40af6df7d3d48c16e
+  m_Pitch: 6b0d1008a53709e48b66029de98d81ae
+  m_Send: 00000000000000000000000000000000
+  m_Effects:
+  - {fileID: 5221877141426783519}
+  m_UserColorIndex: 0
+  m_Mute: 0
+  m_Solo: 0
+  m_BypassEffects: 0

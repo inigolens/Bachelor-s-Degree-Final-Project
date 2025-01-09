@@ -1,0 +1,479 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel FillArray
+#pragma kernel ClearArray
+
+#include "Noise/SimplexNoise.compute"
+#include "Noise/HashNoise.compute"
+
+
+struct Voxel {
+    int ID;
+};
+struct NoisesettingsShaderPrep {
+    uint filterType;
+    float strength;
+    uint numLayers;
+    float baseRoughnes;
+    float roughness;
+    float persistence;
+    float centerX;
+    float centerY;
+    float centerZ;
+    float minValue;
+    float weightMultiplayer;
+    bool useFirstLayer;
+};
+
+struct NoiseLayer {
+    float gain;
+    float frequency;
+    float lacunarity;
+    float persistence;
+    int octaves;
+
+    float caveScale;
+    float caveThreshold;
+
+    int surfaceVoxelId;
+    int subSurfaceVoxelId;
+    int endId;
+};
+
+struct HeightAndnoise {
+    uint height;
+    uint noiseIndex;
+};
+
+
+StructuredBuffer<NoiseLayer> noiseArray;
+RWStructuredBuffer<Voxel> voxelArray;
+RWStructuredBuffer<uint> count;
+
+StructuredBuffer<NoisesettingsShaderPrep> noiseSetLayers;
+uint numNoiseSetLayers;
+float minHeight;
+
+float3 chunkPosition;
+float3 seedOffset;
+
+uint chunkSizeX;
+uint chunkSizeY;
+
+bool generateCaves;
+bool forceFloor;
+
+uint maxHeight;
+uint oceanHeight;
+int noiseCount;
+int seed;
+
+uint lastBiomePlane;
+
+struct BiomePlanePrep{
+    int voxelIdsStartIndex;
+    int voxelIdsLength;
+    int noiseSettingsStartIndex;
+    int noiseSettingsLength;
+};
+StructuredBuffer<BiomePlanePrep> BiomePlanesBuffer;
+StructuredBuffer<int> voxelIdsBuffer;
+StructuredBuffer<NoisesettingsShaderPrep> noiseSettingsBuffer;
+
+StructuredBuffer<NoisesettingsShaderPrep> BiomePlaneNoise;
+uint numBiomes;
+float random(float3 seed){
+    float dotProduct = dot(seed, float3(12.9898, 78.233, 45.164));
+    float sinValue = sin(dotProduct) * 43758.5453;
+    return frac(sinValue);
+}
+
+//1/7
+#define Kv 0.142857142857
+//3/7
+#define Kvo 0.428571428571
+
+float3 modv(float3 x, float y) { return x - y * floor(x/y); }
+float2 modv(float2 x, float y) { return x - y * floor(x/y); }
+
+// Permutation polynomial: (34x^2 + x) modv 289
+float3 Permutation(float3 x) 
+{
+  return modv((34.0 * x + 1.0) * x, 289.0);
+}
+
+
+
+struct VoronoiResult{
+    float2 distances;
+    float2 closestPoint;
+    float2 secondclosestPoint;
+};
+
+struct FoliageData {
+    float3 position;
+    int type;
+};
+
+RWStructuredBuffer<FoliageData> foliageDataBuffer;
+RWStructuredBuffer<uint> foliageCount;
+
+VoronoiResult inoise(float3 P, float jitter)
+{			
+	float3 Pi = modv(floor(P), 289.0);
+ 	float3 Pf = frac(P);
+	float3 oi = float3(-1.0, 0.0, 1.0);
+	float3 of = float3(-0.5, 0.5, 1.5);
+	float3 px = Permutation(Pi.x + oi);
+	float3 py = Permutation(Pi.y + oi);
+
+	float3 p, dx, dy, dz;
+    float ox, oy, oz;
+	VoronoiResult result;
+    result.distances = float2(1e6, 1e6);
+    result.closestPoint = float2(0,0);
+
+	for(int i = 0; i < 3; i++)
+	{
+		for(int j = 0; j < 3; j++)
+		{
+			p = Permutation(px[i] + py[j] + Pi.z + oi); // pij1, pij2, pij3
+
+			ox = frac(p*Kv) - Kvo;
+			oy = modv(floor(p*Kv),7.0)*Kv - Kvo;
+            oz = frac(p*Kv) - Kvo;
+
+			p = Permutation(p);
+			
+			
+		
+			dx = Pf.x - of[i] + jitter*ox;
+			dy = Pf.y - of[j] + jitter*oy;
+			dz = Pf.z - of + jitter*oz;
+			
+			float3 d = dx * dx + dy * dy + dz * dz; // dij1, dij2 and dij3, squared
+			
+			//Find lowest and second lowest distances
+			if(d.x < result.distances.x){
+                result.distances.y = result.distances.x;
+                result.secondclosestPoint = result.closestPoint;
+                result.distances.x = d.x;
+                result.closestPoint = float2(Pi.x + oi[i], Pi.y + oi[j]) + jitter * float2(ox, oy);
+            }else if(d.x < result.distances.y){
+                result.distances.y = d.x;
+                result.secondclosestPoint = float2(Pi.x + oi[i], Pi.y + oi[j]) + jitter * float2(ox, oy);
+            }
+		}
+	}
+    result.distances.x = 0.1 + sqrt(result.distances.y) - sqrt(result.distances.x);
+	return result;
+}
+
+
+float hashFloat3(float3 p){
+    p = frac(p* 0.3183099 + 0.1);
+    p*17.0;
+    float n = p.x * p.y*p.z*(p.x+p.y+p.z);
+    return frac(sin(n)*43758.5453);
+}
+
+int flattenCoord(uint3 idx)
+{
+    return idx.x + (idx.y * (chunkSizeX + 3)) + (idx.z * (chunkSizeX + 3) * (chunkSizeY + 1));
+}
+
+float evaluateNoise(float3 pos, float terrainHeight)
+{
+    float h = 1;
+    float G = exp2(-h);
+    float f = 1;
+    float a = 1;
+    float t = 0;
+    
+    for (int i = 0; i < 4; i++)
+    {
+        t += a * snoise(f * (pos / (noiseArray[0].caveScale / ((uint) terrainHeight > oceanHeight ? 1 : 6))));
+        f *= 2.0;
+        a *= G;
+    }
+    return t;
+}
+
+bool evaluateCave(float3 pos, float terrainHeight)
+{
+    float h = 1;
+    float G = exp2(-h);
+    float f = 1;
+    float a = 1;
+    float t = 0;
+    
+    for (int i = 0; i < 4; i++)
+    {
+        t += a * snoise(f * (pos / (500 / ((uint) terrainHeight > oceanHeight ? 1 : 6))));
+        f *= 2.0;
+        a *= G;
+    }
+    if(t < 0.75) return false;
+    return true;
+}
+
+float fractalNoise(float2 pos, int noisePosition)
+{
+    float v = 0;
+    float amplitude = 1;
+    
+    NoiseLayer b = noiseArray[noisePosition];
+    float3 p1 = float3(pos.xy, seed);
+    for (int i = 0; i < noiseArray[noisePosition].octaves; i++)
+    {
+        v += snoise(float3(p1.xy / b.frequency, seed)) * amplitude;
+
+        p1.xy *= b.lacunarity;
+        
+        amplitude *= b.persistence;
+    }
+    v = v * v;
+    return clamp(v, 0, 1);
+}
+
+struct BiomePlaneResults{
+    uint actualBiomePlane;
+    uint secondBiomePlane;
+    uint BiomePlaneMultvalue;
+};
+
+uint calculateBiomePlane(float val){
+    if(numBiomes <= 1) return 0;
+    float segmentSize = 1.0 / float(numBiomes);
+    int index = int(val/segmentSize) + 1;
+    return uint(index -1);
+}
+
+float sigmoid(float x){
+    return 1.0 / (1.0 + exp(-10.0 * (x - 0.5)));
+}
+
+float3 actualBiomePlane(float2 pos){
+    float frontierMinValue = 0.105;
+    float frontierValue = 0.4;
+    float sizeBiomePlane = 500;
+    float jitterBiomePlanes = 0.8;
+    float BiomePlanechange = 0.5;
+    float3 p1 = float3(pos.xy, seed+10000);
+
+    
+    VoronoiResult voroRes = inoise(float3(p1.xy / sizeBiomePlane, p1.z), jitterBiomePlanes);
+    float v = hashFloat3(float3(voroRes.closestPoint / BiomePlanechange, p1.z));
+    float vSecond = hashFloat3(float3(voroRes.secondclosestPoint / BiomePlanechange, p1.z));
+    uint BiomePlaneValue = calculateBiomePlane(v);
+    uint secondBiomePlaneValue = calculateBiomePlane(vSecond);
+    if(BiomePlaneValue == secondBiomePlaneValue){
+        voroRes.distances.x = 1;
+    }else{
+        if(voroRes.distances.x < frontierMinValue){
+            voroRes.distances.x = 0;
+        }else if(voroRes.distances.x < frontierValue){
+            voroRes.distances.x = sigmoid((voroRes.distances.x - frontierMinValue) / (frontierValue - frontierMinValue));
+        }else{
+            voroRes.distances.x = 1;
+        }
+    }
+    
+    return float3(BiomePlaneValue, voroRes.distances.x, secondBiomePlaneValue);
+}
+float evaluateSimpleNoise(float2 pos, int noisePosition, float noiseVPre ) {
+    
+    NoisesettingsShaderPrep settings = noiseSettingsBuffer[noisePosition];
+    if(settings.useFirstLayer == 1 && noiseVPre <= 0) return 0.0f; 
+
+    float noiseValue = 0;
+    float frequency = settings.baseRoughnes;
+    float amplitude = 1;
+    
+    // Solo necesitamos trabajar con las coordenadas en el plano (x, z)
+    float2 noisePos = pos * frequency + float2(settings.centerX, settings.centerZ);
+
+    for (int i = 0; i < settings.numLayers; i++) {
+        float v = (snoise(float3(noisePos, settings.centerY + seed)) + 1) * 0.5f; // Usamos '0.0' como coordenada Y arbitraria
+        noiseValue += v * amplitude;
+        noisePos *= settings.roughness; // Escalamos las coordenadas de ruido para la siguiente capa
+        amplitude *= settings.persistence;
+    }
+
+    noiseValue -= settings.minValue;
+    if(noiseValue < 0) noiseValue = 0;
+    if(settings.useFirstLayer == 1){
+        return noiseValue * settings.strength * noiseVPre;
+    }
+    return noiseValue * settings.strength; // Este valor puede ser utilizado como la altura en el punto (x, z)
+}
+
+float evaluateRigidNoise(float2 pos, int noisePosition, float noiseVPre) {
+    NoisesettingsShaderPrep settings = noiseSettingsBuffer[noisePosition];
+
+    float noiseValue = 0;
+    float frequency = settings.baseRoughnes;
+    float amplitude = 1;
+    float weight = 1;
+
+    float2 noisePos = pos * frequency + float2(settings.centerX, settings.centerZ);
+
+    for (int i = 0; i < settings.numLayers; i++) {
+        float v = noiseVPre; // Nuevamente, '0.0' como Y arbitraria
+        v *= v; // Aplicamos el efecto de 'rigidez' al cuadrado del valor
+        v *= weight;
+        weight = clamp(v * settings.weightMultiplayer, 0, 1);
+
+        noiseValue += v * amplitude;
+        noisePos *= settings.roughness;
+        amplitude *= settings.persistence;
+    }
+    
+    noiseValue -= settings.minValue;
+    if(noiseValue < 0) noiseValue = 0;
+    return noiseValue * settings.strength; // Este valor puede ser utilizado como la altura en el punto (x, z)
+}
+
+
+
+float evaluateTerrainNoise(float2 pos, float3 actb) {
+    float value = 0;
+    for(int i = BiomePlanesBuffer[actb.x].noiseSettingsStartIndex; i < (BiomePlanesBuffer[actb.x].noiseSettingsStartIndex + BiomePlanesBuffer[actb.x].noiseSettingsLength); i++) {
+        uint filterType = noiseSettingsBuffer[i].filterType;
+        switch (filterType) {
+            case 0:
+                value += evaluateSimpleNoise(pos, i, value);
+                break;
+            case 1:
+                value +=evaluateRigidNoise(pos, i, value);
+                break;
+            default:
+                break;
+        }
+    }
+    value *= actb.y;
+    value += minHeight;
+    
+    float dvalue = 0;
+    for(int i = BiomePlanesBuffer[lastBiomePlane].noiseSettingsStartIndex; i < (BiomePlanesBuffer[lastBiomePlane].noiseSettingsStartIndex + BiomePlanesBuffer[lastBiomePlane].noiseSettingsLength); i++) {
+        uint filterType = noiseSettingsBuffer[i].filterType;
+        switch (filterType) {
+            case 0:
+                dvalue += evaluateSimpleNoise(pos, i, value);
+                break;
+            case 1:
+                dvalue +=evaluateRigidNoise(pos, i, value);
+                break;
+            default:
+                break;
+        }
+    }
+
+    value += dvalue;
+    return clamp(value, 0, 1);
+}
+
+HeightAndnoise
+    sampleHeightAtPoint(float2 pos, float3 ab) {
+    float height = 0;
+
+    float strongestWeight = 0;
+
+    uint count = 0;
+    uint noiseIndex = 0;
+    float heightWeight;
+    int i = 0;
+    
+    float weightH = evaluateTerrainNoise(pos, ab);
+    
+
+        height = clamp((weightH * 240), 0, 250);
+    
+        
+
+    HeightAndnoise hb;
+    hb.height = round(height);
+    hb.noiseIndex = noiseIndex;
+    return hb;
+}
+
+[numthreads(8, 8, 8)]
+void FillArray(uint3 id : SV_DispatchThreadID)
+{
+    if (any(id.xz > chunkSizeX + 2))
+        return;
+    
+    float3 pos = id + chunkPosition + seedOffset;
+    float2 posXZ = pos.xz;
+    float3 actualBiomePlaneValue = actualBiomePlane(posXZ);
+    HeightAndnoise hb = sampleHeightAtPoint(posXZ, actualBiomePlaneValue);
+    uint terrainHeight = hb.height;
+    NoiseLayer selectednoise = noiseArray[hb.noiseIndex];
+    Voxel vox;
+    vox.ID = 0;
+
+    if (id.y > terrainHeight)
+    {
+        vox.ID = 0;
+        voxelArray[flattenCoord(id)] = vox;
+        return;
+    }
+
+    bool isSurfaceBlock = id.y >= terrainHeight - 3;
+
+    //vox.ID = isSurfaceBlock ? selectednoise.surfaceVoxelId : selectednoise.subSurfaceVoxelId;
+    vox.ID = isSurfaceBlock ? voxelIdsBuffer[BiomePlanesBuffer[actualBiomePlaneValue.x].voxelIdsStartIndex+1] : voxelIdsBuffer[BiomePlanesBuffer[actualBiomePlaneValue.x].voxelIdsStartIndex];
+    //vox.ID = voxelIdsBuffer[BiomePlanesBuffer[actualBiomePlaneValue.x].voxelIdsStartIndex];
+    if(evaluateCave(pos, terrainHeight))
+    {
+        float cavenoisetemp = evaluateNoise(pos, terrainHeight);
+        if (generateCaves && cavenoisetemp > selectednoise.caveThreshold && cavenoisetemp < 0.6f)
+        {
+            vox.ID = 0;
+        }
+    }
+    
+
+    if (id.y < 1)
+        vox.ID = 1;
+
+
+    if (vox.ID != 0)
+        InterlockedAdd(count[0], 1);
+
+
+
+    if (id.y == terrainHeight && vox.ID != 0 && id.y < 240)
+    {
+        bool placeFoliage = noise(float3(posXZ * 2, seed)) > 0.999;
+
+        if (placeFoliage)
+        {
+            int typeOf = noise(float3(pos.xz * 25, seed)) * 75;
+            int foliageID;
+            if (typeOf < 30)
+            {
+                
+            }
+            else if (typeOf < 45)
+            {
+                
+            }
+            else if (typeOf < 75)
+            {
+                
+            }
+               
+        }
+    }
+    voxelArray[flattenCoord(id)] = vox;
+
+
+}
+
+[numthreads(8, 8, 8)]
+void ClearArray(uint3 id : SV_DispatchThreadID)
+{
+    Voxel emptyVoxel;
+    emptyVoxel.ID = 0;
+    voxelArray[flattenCoord(id)] = emptyVoxel;
+}
