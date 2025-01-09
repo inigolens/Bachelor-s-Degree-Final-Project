@@ -65,22 +65,6 @@ El proyecto está dividido en las siguientes carpetas y archivos:
 
 ---
 
-## Instalación
-
-1. **Clonar el repositorio:**
-   ```bash
-   git clone https://github.com/usuario/proyecto-generacion-procedural.git
-   ```
-2. **Abrir en Unity:**
-   - Versión recomendada: Unity 2021.3 o superior.
-   - Importar las dependencias necesarias desde el Unity Package Manager.
-
-3. **Ejecutar el proyecto:**
-   - Abre la escena inicial (`MainMenu.unity`).
-   - Ejecuta el juego en el editor o exporta el proyecto para la plataforma deseada.
-
----
-
 ## Instrucciones de Uso
 
 1. **Menú Principal:**
@@ -113,7 +97,7 @@ El desarrollo se llevó a cabo utilizando metodologías ágiles basadas en Scrum
 
 ## Resultados
 
-- **Rendimiento:** El prototipo mantiene un framerate estable incluso en entornos complejos.
+- **Rendimiento:** El prototipo mantiene un framerate relativamente estable incluso en entornos complejos.
 - **Variedad Infinita:** Generación de sistemas solares y planetas virtualmente ilimitados.
 - **Experiencia Inmersiva:** Diseño visual y mecánicas intuitivas para una exploración relajante.
 
