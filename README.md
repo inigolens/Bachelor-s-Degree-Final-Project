@@ -103,15 +103,6 @@ El desarrollo se llevó a cabo utilizando metodologías ágiles basadas en Scrum
 
 ---
 
-## Contribuciones Futuras
-
-Aunque se lograron los objetivos principales, el proyecto deja abierta la posibilidad de ampliar las funcionalidades:
-
-1. **Soporte para Realidad Virtual:** Extensión del prototipo para dispositivos VR.
-2. **Multijugador:** Incorporación de interacciones en línea.
-3. **Generación Procedural de Fauna:** Desarrollo de algoritmos para crear criaturas únicas.
-
-
 ## Contacto
 
 **Autor:** Iñigo Lens  
